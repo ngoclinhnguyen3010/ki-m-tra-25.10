@@ -39,7 +39,7 @@
         <form class="row" method="POST" enctype="multipart/form-data">
             <div class="col">
                 <div class="mb-3">
-                    <input type="file" accept=".txt" class="form-control" name="file" required>
+                    <input type="file" accept=".txt" class="form-control" name="file">
                 </div>
                 <button type="submit" class="btn btn-primary" name="submit">Import database</button>
             </div>
@@ -50,75 +50,57 @@
         <?php
         if (isset($_POST['submit'])) {
             if (isset($_FILES['file']) && $_FILES['file']['error'] == 0) {
-                // Nhận đường dẫn file tạm
                 $fileTmpPath = $_FILES['file']['tmp_name'];
                 $fileName = $_FILES['file']['name'];
                 $fileType = $_FILES['file']['type'];
 
-                // Kiểm tra xem file có phải là TXT hay không
                 if ($fileType == 'text/plain') {
-                    // 1. Đọc dữ liệu file txt
-                    $file = fopen($fileTmpPath, 'r');
-
-                    // Biến để đếm số bản ghi
-                    $successCount = 0;
-                    $failCount = 0;
-
-                    // 2. Insert dữ liệu vào database. Chú ý: nếu bản ghi có Title đã tồn tại thì bỏ qua bản ghi đó
                     $server = "localhost";
-                    $database = "db_nguyen_ngoc_linh";
+                    $database = "Course";
                     $username = "root";
                     $password = "";
-
                     $conn = new mysqli($server, $username, $password, $database);
 
                     if ($conn->connect_error) {
                         die('Connect failed: ' . $conn->connect_error);
                     }
 
+                    $file = fopen($fileTmpPath, 'r');
+                    $successfulInserts = 0;
+                    $failedInserts = 0;
+
                     while (($line = fgets($file)) !== false) {
-                        // Tách dữ liệu từ dòng
                         list($title, $description, $imageUrl) = explode(',', trim($line));
 
-                        // Kiểm tra xem Title đã tồn tại hay chưa
-                        $stmt = $conn->prepare("SELECT * FROM Course WHERE Title = ?");
+                        $checkQuery = "SELECT COUNT(*) as count FROM Course WHERE Title = ?";
+                        $stmt = $conn->prepare($checkQuery);
                         $stmt->bind_param("s", $title);
                         $stmt->execute();
-                        $result = $stmt->get_result();
+                        $result = $stmt->get_result()->fetch_assoc();
 
-                        if ($result->num_rows == 0) {
-                            // Nếu không tồn tại, thực hiện insert
-                            $insertStmt = $conn->prepare("INSERT INTO Course (Title, Description, ImageUrl) VALUES (?, ?, ?)");
-                            $insertStmt->bind_param("sss", $title, $description, $imageUrl);
-                            if ($insertStmt->execute()) {
-                                $successCount++;
+                        if ($result['count'] == 0) {
+                            $insertQuery = "INSERT INTO Course (Title, Description, ImageUrl) VALUES (?, ?, ?)";
+                            $stmt = $conn->prepare($insertQuery);
+                            $stmt->bind_param("sss", $title, $description, $imageUrl);
+
+                            if ($stmt->execute()) {
+                                $successfulInserts++;
                             } else {
-                                $failCount++;
+                                $failedInserts++;
                             }
-                            $insertStmt->close();
                         } else {
-                            $failCount++; // Bản ghi đã tồn tại
+                            $failedInserts++;
                         }
-
-                        $stmt->close();
                     }
 
                     fclose($file);
+                    echo "<div class='alert alert-info mt-2'>Records inserted successfully: $successfulInserts, Failed inserts: $failedInserts</div>";
                     $conn->close();
-
-                    // 3. Thông báo ra màn hình số bản ghi insert thành công, số bản ghi insert không thành công
-                    echo '<div class="alert alert-info mt-2" role="alert">
-                            ' . $successCount . ' records inserted successfully, ' . $failCount . ' records inserted failed.
-                        </div>';
                 } else {
-                    echo '<div class="alert alert-warning" role="alert">
-                            Vui lòng tải lên file .txt!
-                        </div>';
+                    echo '<div class="alert alert-warning" role="alert">Vui lòng tải lên file .txt!</div>';
                 }
             } else {
-                echo '<div class="alert alert-danger" role="alert">
-                        Lỗi tải file!
-                    </div>';
+                echo '<div class="alert alert-danger" role="alert">Lỗi tải file!</div>';
             }
         }
         ?>
@@ -126,7 +108,6 @@
         <hr>
 
         <?php
-        // Hiển thị dữ liệu trong bảng Course
         $server = "localhost";
         $database = "db_nguyen_ngoc_linh";
         $username = "root";
@@ -137,7 +118,7 @@
             die('Connect failed: ' . $conn->connect_error);
         }
 
-        $query = "SELECT * FROM Course";
+        $query = "SELECT * FROM course";
         $result = $conn->query($query);
 
         echo '<div class="row row-cols-1 row-cols-md-2 g-4">';
@@ -156,8 +137,7 @@
         <?php
             }
         }
-        echo ' </div>';
-
+        echo '</div>';
         $conn->close();
         ?>
     </div>
@@ -168,3 +148,4 @@
 </body>
 
 </html>
+
